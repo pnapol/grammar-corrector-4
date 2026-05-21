@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grammar Corrector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, serif;
+      background: #f5f3ee;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e0ddd6;
+      padding: 2rem;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      font-family: Georgia, serif;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      resize: vertical;
+      min-height: 120px;
+      color: #1a1a1a;
+      background: #fafaf8;
+      outline: none;
+    }
+
+    textarea:focus { border-color: #999; background: #fff; }
+
+    .api-row {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 9px 12px;
+      font-size: 13px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: monospace;
+      color: #333;
+      background: #fafaf8;
+      outline: none;
+    }
+
+    input[type="text"]:focus { border-color: #999; }
+
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #1a1a1a;
+      color: #fff;
+      width: 100%;
+      margin-top: 12px;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .result {
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    .result-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .result-box {
+      background: #f0f7f0;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 15px;
+      line-height: 1.8;
+      color: #1a1a1a;
+      white-space: pre-wrap;
+    }
+
+    .error-box {
+      background: #fff0f0;
+      border: 1px solid #f5c6c6;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #c0392b;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #ccc;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Grammar Corrector</h1>
+  <p class="subtitle">Powered by Claude AI — corrects grammar and sentence structure</p>
+
+  <label>Your Anthropic API Key</label>
+  <div class="api-row">
+    <input type="text" id="api-key" placeholder="sk-ant-api03-..." />
+  </div>
+  <p style="font-size:12px; color:#aaa; margin-bottom:1rem;">
+    Get your key at <a href="https://console.anthropic.com" target="_blank" style="color:#666;">console.anthropic.com</a>. It is never saved or sent anywhere except Anthropic.
+  </p>
+
+  <label>Text to Check</label>
+  <textarea id="user-input" placeholder="e.g. their going to the store but she dont have no money"></textarea>
+
+  <button id="submit-btn" onclick="checkGrammar()">Check Grammar</button>
+
+  <div class="result" id="result-area">
+    <p class="result-label">Corrected & Explained</p>
+    <div id="result-box"></div>
+  </div>
+</div>
+
+<script>
+  async function checkGrammar() {
+    const apiKey = document.getElementById('api-key').value.trim();
+    const text = document.getElementById('user-input').value.trim();
+    const btn = document.getElementById('submit-btn');
+    const resultArea = document.getElementById('result-area');
+    const resultBox = document.getElementById('result-box');
+
+    if (!apiKey) {
+      alert('Please enter your Anthropic API key.');
+      return;
+    }
+
+    if (!text) {
+      alert('Please enter some text to check.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Checking...';
+    resultArea.style.display = 'none';
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: `You are a grammar and writing expert. When given text:
+1. Show the corrected version under "Corrected:"
+2. List each correction made under "Corrections:" with a short explanation
+3. If the text is already correct, say "No errors found." and briefly explain why it is correct.
+Be concise and clear.`,
+          messages: [
+            { role: 'user', content: text }
+          ]
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        resultBox.className = 'error-box';
+        resultBox.textContent = 'API Error: ' + data.error.message;
+      } else {
+        const reply = data.content.map(b => b.text || '').join('');
+        resultBox.className = 'result-box';
+        resultBox.textContent = reply;
+      }
+
+      resultArea.style.display = 'block';
+
+    } catch (err) {
+      resultBox.className = 'error-box';
+      resultBox.textContent = 'Network error: ' + err.message;
+      resultArea.style.display = 'block';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Check Grammar';
+  }
+
+  document.getElementById('user-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.ctrlKey) checkGrammar();
+  });
+</script>
+
+</body>
+</html>
